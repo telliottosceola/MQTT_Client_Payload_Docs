@@ -2,7 +2,11 @@
 
 ## Overview
 
-This document describes the structure and fields of the WiFi Halo JSON payload used for MQTT communication. This is a telemetry message that contains device identification, sensor telemetry data, and health status information.
+This document describes the structure and fields of the WiFi Halo JSON payload used for MQTT communication. The payload supports multiple message types including:
+- **Telemetry messages**: Device identification, sensor telemetry data, and health status information
+- **Settings messages**: Device configuration parameters
+- **Settings Acknowledgment messages**: Confirmation of settings updates with current settings
+- **Command Acknowledgment messages**: Confirmation of command execution with results
 
 ## Payload Structure for Telmetry Message
 
@@ -16,6 +20,7 @@ This document describes the structure and fields of the WiFi Halo JSON payload u
     "message_type": "telemetry",
     "timestamp": "epoch_time_seconds",
     "trigger": "interval",
+    "last_settings_update": "epoch_time_seconds",
     "telemetry": {
         "temperature": 22,
         "humidity": 45
@@ -24,7 +29,106 @@ This document describes the structure and fields of the WiFi Halo JSON payload u
         "battery_percentage": 80,
         "rssi": -50,
         "message_counter": 10000
+    },
+    "errors": [
+        {"error": "Temperature sensor error"},
+        {"error": "Humidity sensor error"},
+        {"error": "Battery sensor error"}
+    ]
+}
+```
+
+## Payload Structure for Settings Message
+
+```json
+{
+    "device_id": "1234567890",
+    "sensor_type": "temperature_humidity",
+    "firmware": "1.0.0",
+    "hardware": "1.0.0",
+    "protocol": "1.0.0",
+    "message_type": "settings",
+    "timestamp": "epoch_time_seconds",
+    "trigger": "interval",
+    "last_settings_update": "epoch_time_seconds",
+    "settings": {
+        "telemetry_interval": 10,
+        "settings_interval": 3600,
+        "ssid": "MyWiFi",
+        "mqtt_broker": "mqtt.example.com",
+        "mqtt_client_id": "MyClientId",
+        "mqtt_port": 1883,
+        "mqtt_username": "MyUsername",
+        "mqtt_topic": "MyTopic",
+        "mqtt_qos": 0,
+        "mqtt_retain": false,
+        "ntp_server": "pool.ntp.org",
+        "ntp_timezone": "UTC",
+        "ntp_update_interval": 3600
     }
+}
+```
+
+## Payload Structure for Settings Acknowledgment Message
+
+```json
+{
+    "device_id": "1234567890",
+    "sensor_type": "temperature_humidity",
+    "firmware": "1.0.0",
+    "hardware": "1.0.0",
+    "protocol": "1.0.0",
+    "message_type": "settings_acknowledgment",
+    "timestamp": "epoch_time_seconds",
+    "last_settings_update": "epoch_time_seconds",
+    "settings": {
+        "telemetry_interval": 10,
+        "settings_interval": 3600,
+        "ssid": "MyWiFi",
+        "mqtt_broker": "mqtt.example.com",
+        "mqtt_client_id": "MyClientId",
+        "mqtt_port": 1883,
+        "mqtt_username": "MyUsername",
+        "mqtt_topic": "MyTopic",
+        "mqtt_qos": 0,
+        "mqtt_retain": false,
+        "ntp_server": "pool.ntp.org",
+        "ntp_timezone": "UTC",
+        "ntp_update_interval": 3600
+    },
+    "errors": [
+        {"ntp_update_interval": "invalid url"},
+        {"telemetry_interval": "invalid value type"},
+        {"mqtt_retain": "invalid value"}
+    ]
+}
+```
+
+## Payload Structure for Command Acknowledgment Message
+
+```json
+{
+    "device_id": "1234567890",
+    "sensor_type": "temperature_humidity",
+    "firmware": "1.0.0",
+    "hardware": "1.0.0",
+    "protocol": "1.0.0",
+    "message_type": "command_acknowledgment",
+    "timestamp": "epoch_time_seconds",
+    "last_command_update": "epoch_time_seconds",
+    "command_id": 1001,
+    "command_results": [
+        {"reset_counter": "success"},
+        {"reboot": "failure"},
+        {"factory_reset": "pending"},
+        {"firmware_update": "pending"}
+    ],
+    "errors": [
+        {"reset_counter": "Command execution error"},
+        {"reboot": "Invalid command"},
+        {"factory_reset": "Invalid value"},
+        {"firmware_update": "Invalid Version"}
+    ]
 }
 ```
 
@@ -68,7 +172,8 @@ This document describes the structure and fields of the WiFi Halo JSON payload u
 #### `message_type`
 - **Type**: String
 - **Description**: Type of message being sent
-- **Example**: `"telemetry"` This could also be acknowledgment, settings, etc
+- **Values**: `"telemetry"`, `"settings"`, `"settings_acknowledgment"`, `"command_acknowledgment"`
+- **Example**: `"telemetry"`
 - **Required**: Yes
 
 #### `timestamp`
@@ -82,8 +187,46 @@ This document describes the structure and fields of the WiFi Halo JSON payload u
 - **Type**: String
 - **Description**: Event or condition that triggered the message to be sent
 - **Example**: `"interval"`
-- **Note**: Common values may include "interval" for scheduled messages, interrupt for state change, etc
-- **Required**: Yes
+- **Note**: Common values may include "interval" for scheduled messages, interrupt for state change, etc. Not present in acknowledgment messages.
+- **Required**: Conditional (No for acknowledgment messages)
+
+#### `last_settings_update`
+- **Type**: String
+- **Description**: Timestamp of the last settings update, represented as epoch time in seconds
+- **Format**: Epoch time (seconds since January 1, 1970 UTC)
+- **Example**: `"epoch_time_seconds"`
+- **Required**: Conditional (Present in telemetry, settings, and settings_acknowledgment messages)
+
+#### `last_command_update`
+- **Type**: String
+- **Description**: Timestamp of the last command update, represented as epoch time in seconds
+- **Format**: Epoch time (seconds since January 1, 1970 UTC)
+- **Example**: `"epoch_time_seconds"`
+- **Required**: Conditional (Present in command_acknowledgment messages)
+
+#### `command_id`
+- **Type**: Number
+- **Description**: Unique identifier for the command being acknowledged
+- **Example**: `1001`
+- **Required**: Conditional (Yes for command_acknowledgment messages)
+
+#### `command_results`
+- **Type**: Array of Objects
+- **Description**: Array containing the results of command execution. Each object contains a command name as the key and its result status as the value.
+- **Result Status Values**: "success", "failure", "pending"
+- **Example**: `[{"reset_counter": "success"}, {"reboot": "failure"}, {"factory_reset": "pending"}]`
+- **Required**: Conditional (Yes for command_acknowledgment messages)
+
+#### `errors`
+- **Type**: Array of Objects
+- **Description**: Array containing error information. The structure varies by message type:
+  - **Telemetry messages**: Generic error messages with structure `[{"error": "error_message"}]`
+  - **Settings Acknowledgment messages**: Field-specific validation errors with structure `[{"field_name": "error_message"}]`
+  - **Command Acknowledgment messages**: Command-specific execution errors with structure `[{"command_name": "error_message"}]`
+- **Example (Telemetry)**: `[{"error": "Temperature sensor error"}, {"error": "Humidity sensor error"}]`
+- **Example (Settings Acknowledgment)**: `[{"ntp_update_interval": "invalid url"}, {"telemetry_interval": "invalid value type"}]`
+- **Example (Command Acknowledgment)**: `[{"reset_counter": "Command execution error"}, {"reboot": "Invalid command"}]`
+- **Required**: Conditional (Optional - only present when errors occur)
 
 ### Telemetry Object
 
@@ -127,20 +270,123 @@ The `health` object contains device health and status information.
 - **Example**: `10000`
 - **Required**: Yes
 
+### Settings Object
+
+The `settings` object contains device configuration parameters. This object is present when `message_type` is "settings" or "settings_acknowledgment".
+
+#### `settings.telemetry_interval`
+- **Type**: Number
+- **Description**: Interval in seconds between telemetry message transmissions
+- **Example**: `10`
+- **Required**: Yes
+
+#### `settings.settings_interval`
+- **Type**: Number
+- **Description**: Interval in seconds between settings message transmissions
+- **Example**: `3600`
+- **Required**: Yes
+
+#### `settings.ssid`
+- **Type**: String
+- **Description**: WiFi network SSID (Service Set Identifier)
+- **Example**: `"MyWiFi"`
+- **Required**: Yes
+
+#### `settings.mqtt_broker`
+- **Type**: String
+- **Description**: MQTT broker hostname or IP address
+- **Example**: `"mqtt.example.com"`
+- **Required**: Yes
+
+#### `settings.mqtt_client_id`
+- **Type**: String
+- **Description**: MQTT client identifier
+- **Example**: `"MyClientId"`
+- **Required**: Yes
+
+#### `settings.mqtt_port`
+- **Type**: Number
+- **Description**: MQTT broker port number
+- **Example**: `1883`
+- **Required**: Yes
+
+#### `settings.mqtt_username`
+- **Type**: String
+- **Description**: MQTT broker username for authentication
+- **Example**: `"MyUsername"`
+- **Required**: Yes
+
+#### `settings.mqtt_topic`
+- **Type**: String
+- **Description**: MQTT topic to publish messages to
+- **Example**: `"MyTopic"`
+- **Required**: Yes
+
+#### `settings.mqtt_qos`
+- **Type**: Number
+- **Description**: MQTT Quality of Service level (0, 1, or 2)
+- **Range**: 0-2
+- **Example**: `0`
+- **Note**: 0 = at most once, 1 = at least once, 2 = exactly once
+- **Required**: Yes
+
+#### `settings.mqtt_retain`
+- **Type**: Boolean
+- **Description**: MQTT retain flag
+- **Example**: `false`
+- **Note**: If true, the broker will retain the last message published to the topic
+- **Required**: Yes
+
+#### `settings.ntp_server`
+- **Type**: String
+- **Description**: NTP (Network Time Protocol) server hostname
+- **Example**: `"pool.ntp.org"`
+- **Required**: Yes
+
+#### `settings.ntp_timezone`
+- **Type**: String
+- **Description**: Timezone identifier
+- **Example**: `"UTC"`
+- **Required**: Yes
+
+#### `settings.ntp_update_interval`
+- **Type**: Number
+- **Description**: Interval in seconds between NTP time synchronization updates
+- **Example**: `3600`
+- **Required**: Yes
+
 ## Usage Notes
 
-- All fields are required in the payload
+- All fields are required in the payload (except where noted as conditional)
 - The payload should be sent as a JSON string over MQTT
-- This is a telemetry message type, as indicated by the `message_type` field
+- Message types are indicated by the `message_type` field (e.g., "telemetry", "settings", "settings_acknowledgment", "command_acknowledgment")
 - The `timestamp` field uses epoch time in seconds (Unix timestamp)
-- The `trigger` field indicates what caused the message to be sent (e.g., "interval" for scheduled messages)
-- Temperature is measured in degrees Celsius
-- Humidity is a percentage value (0-100)
-- Battery percentage represents remaining charge (0-100)
-- RSSI values are negative numbers, with values closer to 0 indicating better signal strength
-- The message counter increments with each message sent and can be used for message tracking and detecting missed messages
+- The `trigger` field indicates what caused the message to be sent (e.g., "interval" for scheduled messages, "interrupt" for state change). Not present in acknowledgment messages.
+- For telemetry messages:
+  - Temperature is measured in degrees Celsius
+  - Humidity is a percentage value (0-100)
+  - Battery percentage represents remaining charge (0-100)
+  - RSSI values are negative numbers, with values closer to 0 indicating better signal strength
+  - The message counter increments with each message sent and can be used for message tracking and detecting missed messages
+- For settings and settings_acknowledgment messages:
+  - Intervals are specified in seconds
+  - MQTT QoS levels: 0 = at most once, 1 = at least once, 2 = exactly once
+  - NTP update interval is specified in seconds
+- For settings_acknowledgment messages:
+  - Sent in response to settings updates to confirm the current settings state
+  - Contains the `last_settings_update` timestamp indicating when settings were last modified
+- For command_acknowledgment messages:
+  - Sent in response to command execution requests
+  - Contains `command_id` to identify the command being acknowledged
+  - `command_results` array contains the execution status for each command (success, failure, pending)
+- The `errors` array is optional and only present when errors occur:
+  - In telemetry messages: reports sensor or device errors
+  - In settings_acknowledgment messages: reports validation errors for specific settings fields
+  - In command_acknowledgment messages: reports execution errors for specific commands
 
-## Example Payload
+## Example Payloads
+
+### Telemetry Message Example
 
 ```json
 {
@@ -152,6 +398,7 @@ The `health` object contains device health and status information.
     "message_type": "telemetry",
     "timestamp": "epoch_time_seconds",
     "trigger": "interval",
+    "last_settings_update": "epoch_time_seconds",
     "telemetry": {
         "temperature": 22,
         "humidity": 45
@@ -160,7 +407,106 @@ The `health` object contains device health and status information.
         "battery_percentage": 80,
         "rssi": -50,
         "message_counter": 10000
+    },
+    "errors": [
+        {"error": "Temperature sensor error"},
+        {"error": "Humidity sensor error"},
+        {"error": "Battery sensor error"}
+    ]
+}
+```
+
+### Settings Message Example
+
+```json
+{
+    "device_id": "1234567890",
+    "sensor_type": "temperature_humidity",
+    "firmware": "1.0.0",
+    "hardware": "1.0.0",
+    "protocol": "1.0.0",
+    "message_type": "settings",
+    "timestamp": "epoch_time_seconds",
+    "trigger": "interval",
+    "last_settings_update": "epoch_time_seconds",
+    "settings": {
+        "telemetry_interval": 10,
+        "settings_interval": 3600,
+        "ssid": "MyWiFi",
+        "mqtt_broker": "mqtt.example.com",
+        "mqtt_client_id": "MyClientId",
+        "mqtt_port": 1883,
+        "mqtt_username": "MyUsername",
+        "mqtt_topic": "MyTopic",
+        "mqtt_qos": 0,
+        "mqtt_retain": false,
+        "ntp_server": "pool.ntp.org",
+        "ntp_timezone": "UTC",
+        "ntp_update_interval": 3600
     }
+}
+```
+
+### Settings Acknowledgment Message Example
+
+```json
+{
+    "device_id": "1234567890",
+    "sensor_type": "temperature_humidity",
+    "firmware": "1.0.0",
+    "hardware": "1.0.0",
+    "protocol": "1.0.0",
+    "message_type": "settings_acknowledgment",
+    "timestamp": "epoch_time_seconds",
+    "last_settings_update": "epoch_time_seconds",
+    "settings": {
+        "telemetry_interval": 10,
+        "settings_interval": 3600,
+        "ssid": "MyWiFi",
+        "mqtt_broker": "mqtt.example.com",
+        "mqtt_client_id": "MyClientId",
+        "mqtt_port": 1883,
+        "mqtt_username": "MyUsername",
+        "mqtt_topic": "MyTopic",
+        "mqtt_qos": 0,
+        "mqtt_retain": false,
+        "ntp_server": "pool.ntp.org",
+        "ntp_timezone": "UTC",
+        "ntp_update_interval": 3600
+    },
+    "errors": [
+        {"ntp_update_interval": "invalid url"},
+        {"telemetry_interval": "invalid value type"},
+        {"mqtt_retain": "invalid value"}
+    ]
+}
+```
+
+### Command Acknowledgment Message Example
+
+```json
+{
+    "device_id": "1234567890",
+    "sensor_type": "temperature_humidity",
+    "firmware": "1.0.0",
+    "hardware": "1.0.0",
+    "protocol": "1.0.0",
+    "message_type": "command_acknowledgment",
+    "timestamp": "epoch_time_seconds",
+    "last_command_update": "epoch_time_seconds",
+    "command_id": 1001,
+    "command_results": [
+        {"reset_counter": "success"},
+        {"reboot": "failure"},
+        {"factory_reset": "pending"},
+        {"firmware_update": "pending"}
+    ],
+    "errors": [
+        {"reset_counter": "Command execution error"},
+        {"reboot": "Invalid command"},
+        {"factory_reset": "Invalid value"},
+        {"firmware_update": "Invalid Version"}
+    ]
 }
 ```
 
