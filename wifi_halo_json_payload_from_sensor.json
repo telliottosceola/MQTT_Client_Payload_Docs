@@ -89,15 +89,16 @@
     "message_type": "command_acknowledgment",
     "timestamp": "epoch_time_seconds",
     "last_command_update":"epoch_time_seconds",
-    "command_id":1001,
+    // correlation_id may be more useful as string, i.e. for modbus devices use "query_flow_ft3500", or "query_all_ft3500" to more easily identify call and response.
+    "correlation_id":1001,
     "command_results":[
-        {"reset_counter":"success"},
+        {"reset_lifetime_packets":"success"},
         {"reboot":"failure"},
         {"factory_reset":"pending"},
         {"firmware_update":"pending"}
     ],
     "errors":[
-        {"reset_counter":"Command execution error"},
+        {"reset_lifetime_packets":"Command execution error"},
         {"reboot":"Invalid command"},
         {"factory_reset":"Invalid value"},
         {"firmware_update":"Invalid Version"}

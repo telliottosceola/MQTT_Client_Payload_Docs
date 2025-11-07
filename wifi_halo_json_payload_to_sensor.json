@@ -1,0 +1,53 @@
+//Settings Message
+{
+    "message_type": "configuration",
+    // The use case for device_id is to identify the device that the command is intended for.
+    // This would only be useful if customers wanted to use a single MQTT subcribe topic for all sensor, which is bad choice in general.
+    // May be useful depending on final integration testing into AWS and Azure.
+    "device_id": "1234567890",
+    // Sensor can report this back to confirm when it received the request.
+    // May not be necessary, evaluate before implementation. Only seems useful if intitiating software expires these requests and the sensor reports in after that timeout.
+    "timestamp": "epoch_time_seconds",
+    "settings":{
+        "telemetry_interval":10,
+        "settings_interval":3600,
+        "ssid":"MyWiFi",
+        "mqtt_broker":"mqtt.example.com",
+        "mqtt_client_id":"MyClientId",
+        "mqtt_port":1883,
+        "mqtt_username":"MyUsername",
+        "mqtt_topic":"MyTopic",
+        "mqtt_qos":0,
+        "mqtt_retain":false,
+        "ntp_server":"pool.ntp.org",
+        "ntp_timezone":"UTC",
+        "ntp_update_interval":3600
+    }
+    // May be useful to let customer specify the response topic for the command, probably a complication on the sensor side so we should test integration into AWS and Azure before implementing this.
+    // Simply here as a placeholder solution for unsubstantiated use case.
+    "response_topic":"/command/response/1234567890"
+}
+
+//Command Message
+{
+    "message_type": "command",
+    // The use case for device_id is to identify the device that the command is intended for.
+    // This would only be useful if customers wanted to use a single MQTT subcribe topic for all sensor, which is bad design.
+    // May be useful depending on final integration testing into AWS and Azure.
+    "device_id": "1234567890",
+    // correlation_id may be more useful as string, i.e. for modbus devices use "query_flow_ft3500", or "query_all_ft3500" to more easily identify call and response.
+    "correlation_id":1001,
+    // Sensor can report this back to confirm when it received the request.
+    // May not be necessary, evaluate before implementation. Only seems useful if intitiating software expires these requests and the sensor reports in after that timeout.
+    "timestamp": "epoch_time_seconds",
+    "command_list":[
+        {"reset_lifetime_packets":{}},
+        {"reboot":{}},
+        {"factory_reset":{"reboot": true}},
+        {"firmware_update":{"target_version": "1.0.0"}},
+        {"request_raw_data": {"odr": 800, "duration": 1000, "lpf": 4, "hpf": 2048}}
+    ],
+    // May be useful to let customer specify the response topic for the command, probably a complication on the sensor side so we should test integration into AWS and Azure before implementing this.
+    // Simply here as a placeholder solution for unsubstantiated use case.
+    "response_topic":"/command/response/1234567890"
+}
