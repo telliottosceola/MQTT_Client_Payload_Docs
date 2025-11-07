@@ -46,7 +46,7 @@
         "ntp_server":"pool.ntp.org",
         "ntp_timezone":"UTC",
         "ntp_update_interval":3600
-    }
+    },
 }
 //Setting Acknowledgment Message
 {
@@ -58,6 +58,7 @@
     "message_type": "settings_acknowledgment",
     "timestamp": "epoch_time_seconds",
     "last_settings_update":"epoch_time_seconds",
+    "configure_request_timestamp":"epoch_time_seconds_from_configure_request",
     "settings":{
         "telemetry_interval":10,
         "settings_interval":3600,
@@ -90,7 +91,7 @@
     "timestamp": "epoch_time_seconds",
     "last_command_update":"epoch_time_seconds",
     // correlation_id may be more useful as string, i.e. for modbus devices use "query_flow_ft3500", or "query_all_ft3500" to more easily identify call and response.
-    "correlation_id":1001,
+    "correlation_id":"daily_command_1001",
     "command_results":[
         {"reset_lifetime_packets":"success"},
         {"reboot":"failure"},

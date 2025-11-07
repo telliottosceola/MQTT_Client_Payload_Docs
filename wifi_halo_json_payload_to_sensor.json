@@ -1,9 +1,8 @@
 //Settings Message
 {
     "message_type": "configuration",
-    // The use case for device_id is to identify the device that the command is intended for.
+    // device_id is optional, but recommended to identify the device that the command is intended for.
     // This would only be useful if customers wanted to use a single MQTT subcribe topic for all sensor, which is bad choice in general.
-    // May be useful depending on final integration testing into AWS and Azure.
     "device_id": "1234567890",
     // Sensor can report this back to confirm when it received the request.
     // May not be necessary, evaluate before implementation. Only seems useful if intitiating software expires these requests and the sensor reports in after that timeout.
@@ -36,7 +35,7 @@
     // May be useful depending on final integration testing into AWS and Azure.
     "device_id": "1234567890",
     // correlation_id may be more useful as string, i.e. for modbus devices use "query_flow_ft3500", or "query_all_ft3500" to more easily identify call and response.
-    "correlation_id":1001,
+    "correlation_id":"daily_command_1001",
     // Sensor can report this back to confirm when it received the request.
     // May not be necessary, evaluate before implementation. Only seems useful if intitiating software expires these requests and the sensor reports in after that timeout.
     "timestamp": "epoch_time_seconds",

@@ -3,12 +3,63 @@
 ## Overview
 
 This document describes the structure and fields of the WiFi Halo JSON payload used for MQTT communication. The payload supports multiple message types including:
+
+### Messages TO Sensor (Commands/Configuration)
+- **Configuration messages**: Device configuration parameters sent to the sensor
+- **Command messages**: Commands sent to the sensor for execution
+
+### Messages FROM Sensor (Responses/Telemetry)
 - **Telemetry messages**: Device identification, sensor telemetry data, and health status information
-- **Settings messages**: Device configuration parameters
+- **Settings messages**: Device configuration parameters (periodic updates)
 - **Settings Acknowledgment messages**: Confirmation of settings updates with current settings
 - **Command Acknowledgment messages**: Confirmation of command execution with results
 
-## Payload Structure for Telmetry Message
+## Payload Structure for Configuration Message (TO Sensor)
+
+```json
+{
+    "message_type": "configuration",
+    "device_id": "1234567890",
+    "timestamp": "epoch_time_seconds",
+    "settings": {
+        "telemetry_interval": 10,
+        "settings_interval": 3600,
+        "ssid": "MyWiFi",
+        "mqtt_broker": "mqtt.example.com",
+        "mqtt_client_id": "MyClientId",
+        "mqtt_port": 1883,
+        "mqtt_username": "MyUsername",
+        "mqtt_topic": "MyTopic",
+        "mqtt_qos": 0,
+        "mqtt_retain": false,
+        "ntp_server": "pool.ntp.org",
+        "ntp_timezone": "UTC",
+        "ntp_update_interval": 3600
+    },
+    "response_topic": "/command/response/1234567890"
+}
+```
+
+## Payload Structure for Command Message (TO Sensor)
+
+```json
+{
+    "message_type": "command",
+    "device_id": "1234567890",
+    "correlation_id": "daily_command_1001",
+    "timestamp": "epoch_time_seconds",
+    "command_list": [
+        {"reset_lifetime_packets": {}},
+        {"reboot": {}},
+        {"factory_reset": {"reboot": true}},
+        {"firmware_update": {"target_version": "1.0.0"}},
+        {"request_raw_data": {"odr": 800, "duration": 1000, "lpf": 4, "hpf": 2048}}
+    ],
+    "response_topic": "/command/response/1234567890"
+}
+```
+
+## Payload Structure for Telemetry Message (FROM Sensor)
 
 ```json
 {
@@ -38,7 +89,7 @@ This document describes the structure and fields of the WiFi Halo JSON payload u
 }
 ```
 
-## Payload Structure for Settings Message
+## Payload Structure for Settings Message (FROM Sensor)
 
 ```json
 {
@@ -69,7 +120,7 @@ This document describes the structure and fields of the WiFi Halo JSON payload u
 }
 ```
 
-## Payload Structure for Settings Acknowledgment Message
+## Payload Structure for Settings Acknowledgment Message (FROM Sensor)
 
 ```json
 {
@@ -81,6 +132,7 @@ This document describes the structure and fields of the WiFi Halo JSON payload u
     "message_type": "settings_acknowledgment",
     "timestamp": "epoch_time_seconds",
     "last_settings_update": "epoch_time_seconds",
+    "configure_request_timestamp": "epoch_time_seconds_from_configure_request",
     "settings": {
         "telemetry_interval": 10,
         "settings_interval": 3600,
@@ -104,7 +156,7 @@ This document describes the structure and fields of the WiFi Halo JSON payload u
 }
 ```
 
-## Payload Structure for Command Acknowledgment Message
+## Payload Structure for Command Acknowledgment Message (FROM Sensor)
 
 ```json
 {
@@ -116,15 +168,15 @@ This document describes the structure and fields of the WiFi Halo JSON payload u
     "message_type": "command_acknowledgment",
     "timestamp": "epoch_time_seconds",
     "last_command_update": "epoch_time_seconds",
-    "command_id": 1001,
+    "correlation_id": "daily_command_1001",
     "command_results": [
-        {"reset_counter": "success"},
+        {"reset_lifetime_packets": "success"},
         {"reboot": "failure"},
         {"factory_reset": "pending"},
         {"firmware_update": "pending"}
     ],
     "errors": [
-        {"reset_counter": "Command execution error"},
+        {"reset_lifetime_packets": "Command execution error"},
         {"reboot": "Invalid command"},
         {"factory_reset": "Invalid value"},
         {"firmware_update": "Invalid Version"}
@@ -172,7 +224,7 @@ This document describes the structure and fields of the WiFi Halo JSON payload u
 #### `message_type`
 - **Type**: String
 - **Description**: Type of message being sent
-- **Values**: `"telemetry"`, `"settings"`, `"settings_acknowledgment"`, `"command_acknowledgment"`
+- **Values**: `"configuration"`, `"command"` (TO sensor), `"telemetry"`, `"settings"`, `"settings_acknowledgment"`, `"command_acknowledgment"` (FROM sensor)
 - **Example**: `"telemetry"`
 - **Required**: Yes
 
@@ -204,17 +256,36 @@ This document describes the structure and fields of the WiFi Halo JSON payload u
 - **Example**: `"epoch_time_seconds"`
 - **Required**: Conditional (Present in command_acknowledgment messages)
 
-#### `command_id`
-- **Type**: Number
-- **Description**: Unique identifier for the command being acknowledged
-- **Example**: `1001`
-- **Required**: Conditional (Yes for command_acknowledgment messages)
+#### `correlation_id`
+- **Type**: String
+- **Description**: Unique identifier for correlating command requests with their acknowledgments. This value is sent in command messages (TO sensor) and echoed back in command_acknowledgment messages (FROM sensor) to match responses to requests.
+- **Example**: `"daily_command_1001"`
+- **Required**: Conditional (Yes for command and command_acknowledgment messages)
+
+#### `configure_request_timestamp`
+- **Type**: String
+- **Description**: Timestamp from the original configuration request, echoed back in settings_acknowledgment messages to correlate the acknowledgment with the original request
+- **Format**: Epoch time (seconds since January 1, 1970 UTC)
+- **Example**: `"epoch_time_seconds_from_configure_request"`
+- **Required**: Conditional (Present in settings_acknowledgment messages)
+
+#### `response_topic`
+- **Type**: String
+- **Description**: MQTT topic where the sensor should publish its response/acknowledgment message. Allows the sender to specify a custom response topic for commands and configuration messages.
+- **Example**: `"/command/response/1234567890"`
+- **Required**: Conditional (Optional for configuration and command messages)
+
+#### `command_list`
+- **Type**: Array of Objects
+- **Description**: Array containing commands to be executed. Each object contains a command name as the key and command parameters as the value.
+- **Example**: `[{"reset_lifetime_packets": {}}, {"reboot": {}}, {"factory_reset": {"reboot": true}}]`
+- **Required**: Conditional (Yes for command messages)
 
 #### `command_results`
 - **Type**: Array of Objects
 - **Description**: Array containing the results of command execution. Each object contains a command name as the key and its result status as the value.
 - **Result Status Values**: "success", "failure", "pending"
-- **Example**: `[{"reset_counter": "success"}, {"reboot": "failure"}, {"factory_reset": "pending"}]`
+- **Example**: `[{"reset_lifetime_packets": "success"}, {"reboot": "failure"}, {"factory_reset": "pending"}]`
 - **Required**: Conditional (Yes for command_acknowledgment messages)
 
 #### `errors`
@@ -225,7 +296,7 @@ This document describes the structure and fields of the WiFi Halo JSON payload u
   - **Command Acknowledgment messages**: Command-specific execution errors with structure `[{"command_name": "error_message"}]`
 - **Example (Telemetry)**: `[{"error": "Temperature sensor error"}, {"error": "Humidity sensor error"}]`
 - **Example (Settings Acknowledgment)**: `[{"ntp_update_interval": "invalid url"}, {"telemetry_interval": "invalid value type"}]`
-- **Example (Command Acknowledgment)**: `[{"reset_counter": "Command execution error"}, {"reboot": "Invalid command"}]`
+- **Example (Command Acknowledgment)**: `[{"reset_lifetime_packets": "Command execution error"}, {"reboot": "Invalid command"}]`
 - **Required**: Conditional (Optional - only present when errors occur)
 
 ### Telemetry Object
@@ -359,9 +430,20 @@ The `settings` object contains device configuration parameters. This object is p
 
 - All fields are required in the payload (except where noted as conditional)
 - The payload should be sent as a JSON string over MQTT
-- Message types are indicated by the `message_type` field (e.g., "telemetry", "settings", "settings_acknowledgment", "command_acknowledgment")
+- Message types are indicated by the `message_type` field:
+  - **TO Sensor**: `"configuration"`, `"command"`
+  - **FROM Sensor**: `"telemetry"`, `"settings"`, `"settings_acknowledgment"`, `"command_acknowledgment"`
 - The `timestamp` field uses epoch time in seconds (Unix timestamp)
-- The `trigger` field indicates what caused the message to be sent (e.g., "interval" for scheduled messages, "interrupt" for state change). Not present in acknowledgment messages.
+- The `trigger` field indicates what caused the message to be sent (e.g., "interval" for scheduled messages, "interrupt" for state change). Not present in acknowledgment messages or messages TO sensor.
+- For configuration and command messages (TO sensor):
+  - `device_id` is optional but recommended to identify the target device
+  - `timestamp` can be included to track when the request was sent
+  - `response_topic` is optional and allows specifying a custom MQTT topic for responses
+  - `correlation_id` (command messages) is used to match command acknowledgments with their requests
+- For command messages:
+  - `command_list` contains an array of commands to execute
+  - Each command is an object with the command name as the key and parameters as the value
+  - Supported commands include: `reset_lifetime_packets`, `reboot`, `factory_reset`, `firmware_update`, `request_raw_data`
 - For telemetry messages:
   - Temperature is measured in degrees Celsius
   - Humidity is a percentage value (0-100)
@@ -373,11 +455,12 @@ The `settings` object contains device configuration parameters. This object is p
   - MQTT QoS levels: 0 = at most once, 1 = at least once, 2 = exactly once
   - NTP update interval is specified in seconds
 - For settings_acknowledgment messages:
-  - Sent in response to settings updates to confirm the current settings state
+  - Sent in response to configuration messages to confirm the current settings state
   - Contains the `last_settings_update` timestamp indicating when settings were last modified
+  - Contains `configure_request_timestamp` to correlate with the original configuration request
 - For command_acknowledgment messages:
   - Sent in response to command execution requests
-  - Contains `command_id` to identify the command being acknowledged
+  - Contains `correlation_id` to match the acknowledgment with the original command request
   - `command_results` array contains the execution status for each command (success, failure, pending)
 - The `errors` array is optional and only present when errors occur:
   - In telemetry messages: reports sensor or device errors
@@ -386,7 +469,52 @@ The `settings` object contains device configuration parameters. This object is p
 
 ## Example Payloads
 
-### Telemetry Message Example
+### Configuration Message Example (TO Sensor)
+
+```json
+{
+    "message_type": "configuration",
+    "device_id": "1234567890",
+    "timestamp": "epoch_time_seconds",
+    "settings": {
+        "telemetry_interval": 10,
+        "settings_interval": 3600,
+        "ssid": "MyWiFi",
+        "mqtt_broker": "mqtt.example.com",
+        "mqtt_client_id": "MyClientId",
+        "mqtt_port": 1883,
+        "mqtt_username": "MyUsername",
+        "mqtt_topic": "MyTopic",
+        "mqtt_qos": 0,
+        "mqtt_retain": false,
+        "ntp_server": "pool.ntp.org",
+        "ntp_timezone": "UTC",
+        "ntp_update_interval": 3600
+    },
+    "response_topic": "/command/response/1234567890"
+}
+```
+
+### Command Message Example (TO Sensor)
+
+```json
+{
+    "message_type": "command",
+    "device_id": "1234567890",
+    "correlation_id": "daily_command_1001",
+    "timestamp": "epoch_time_seconds",
+    "command_list": [
+        {"reset_lifetime_packets": {}},
+        {"reboot": {}},
+        {"factory_reset": {"reboot": true}},
+        {"firmware_update": {"target_version": "1.0.0"}},
+        {"request_raw_data": {"odr": 800, "duration": 1000, "lpf": 4, "hpf": 2048}}
+    ],
+    "response_topic": "/command/response/1234567890"
+}
+```
+
+### Telemetry Message Example (FROM Sensor)
 
 ```json
 {
@@ -416,7 +544,7 @@ The `settings` object contains device configuration parameters. This object is p
 }
 ```
 
-### Settings Message Example
+### Settings Message Example (FROM Sensor)
 
 ```json
 {
@@ -447,7 +575,7 @@ The `settings` object contains device configuration parameters. This object is p
 }
 ```
 
-### Settings Acknowledgment Message Example
+### Settings Acknowledgment Message Example (FROM Sensor)
 
 ```json
 {
@@ -459,6 +587,7 @@ The `settings` object contains device configuration parameters. This object is p
     "message_type": "settings_acknowledgment",
     "timestamp": "epoch_time_seconds",
     "last_settings_update": "epoch_time_seconds",
+    "configure_request_timestamp": "epoch_time_seconds_from_configure_request",
     "settings": {
         "telemetry_interval": 10,
         "settings_interval": 3600,
@@ -482,7 +611,7 @@ The `settings` object contains device configuration parameters. This object is p
 }
 ```
 
-### Command Acknowledgment Message Example
+### Command Acknowledgment Message Example (FROM Sensor)
 
 ```json
 {
@@ -494,15 +623,15 @@ The `settings` object contains device configuration parameters. This object is p
     "message_type": "command_acknowledgment",
     "timestamp": "epoch_time_seconds",
     "last_command_update": "epoch_time_seconds",
-    "command_id": 1001,
+    "correlation_id": "daily_command_1001",
     "command_results": [
-        {"reset_counter": "success"},
+        {"reset_lifetime_packets": "success"},
         {"reboot": "failure"},
         {"factory_reset": "pending"},
         {"firmware_update": "pending"}
     ],
     "errors": [
-        {"reset_counter": "Command execution error"},
+        {"reset_lifetime_packets": "Command execution error"},
         {"reboot": "Invalid command"},
         {"factory_reset": "Invalid value"},
         {"firmware_update": "Invalid Version"}
